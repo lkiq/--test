@@ -1,0 +1,9 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-05-24T08:51:59.802Z
+provider: 
+---
+
+对项目用Git初始化时，注意把不需要的内容排除掉
