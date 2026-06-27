@@ -1,0 +1,4 @@
+interface:
+  display_name: "FE 前端工程智能体"
+  short_description: "开发页面并对接 API，处理状态反馈、字段映射和联调问题。"
+  default_prompt: "Use $frontend-engineer to build pages and connect backend APIs."

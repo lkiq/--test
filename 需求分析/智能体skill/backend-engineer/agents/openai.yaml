@@ -1,0 +1,4 @@
+interface:
+  display_name: "BE 后端工程智能体"
+  short_description: "按 HLD 开发 API，处理校验、业务逻辑、错误响应和联调。"
+  default_prompt: "Use $backend-engineer to implement backend APIs from the HLD contract."

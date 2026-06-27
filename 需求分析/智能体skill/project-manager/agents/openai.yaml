@@ -1,0 +1,4 @@
+interface:
+  display_name: "PM 项目管理智能体"
+  short_description: "拆解每日排期、跟踪风险阻塞、维护会议结论和交付节奏。"
+  default_prompt: "Use $project-manager to create a practical daily module schedule."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "SA 系统架构智能体"
+  short_description: "输出 HLD、接口契约、模块边界和前后端联调规则。"
+  default_prompt: "Use $system-architect to turn requirements into HLD and API contracts."

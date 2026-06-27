@@ -1,0 +1,4 @@
+interface:
+  display_name: "指挥官调度智能体"
+  short_description: "统筹多角色协作，推进 V1.0 模块开发、联调、测试和复盘。"
+  default_prompt: "Use $commander-orchestrator to coordinate the V1.0 daily development loop."

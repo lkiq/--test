@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA 测试工程智能体"
+  short_description: "编写测试用例，验证接口、页面、异常和端到端流程。"
+  default_prompt: "Use $qa-engineer to test one completed module before the next starts."
