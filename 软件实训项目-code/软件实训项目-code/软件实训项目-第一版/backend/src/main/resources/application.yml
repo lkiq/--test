@@ -9,6 +9,14 @@ spring:
   application:
     name: career-platform
 
+# HTTP 编码强制 UTF-8（修复中文乱码）
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
 # 文件上传配置
 file:
   upload:
