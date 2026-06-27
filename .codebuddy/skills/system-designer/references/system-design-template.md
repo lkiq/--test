@@ -8,12 +8,12 @@
 | **Status**    | `Draft` / `Review` / `Approved`                                          |
 | **Author**    | {Author Name or Agent}                                                   |
 | **Date**      | {YYYY-MM-DD}                                                              |
-| **L1 Detail** | [{system-id}.detail.md](./{system-id}.detail.md) — Load only during `/forge` |
+| **L1 Detail** | [{system-id}.detail.md](./{system-id}.detail.md) — Load only during development tasks |
 
 > [!IMPORTANT]
 > **Document Layering Explanation**
 > - **This file (L0 Navigation Layer)**: Architecture diagrams, operation contracts, design decisions. For quick understanding and task planning. Prohibited from placing config dictionaries, algorithm pseudocode and method bodies.
-> - **[{system-id}.detail.md](./{system-id}.detail.md) (L1 Implementation Layer)**: Complete pseudocode, config constants, edge cases. Load only when explicitly referenced by `/forge` tasks.
+> - **[{system-id}.detail.md](./{system-id}.detail.md) (L1 Implementation Layer)**: Complete pseudocode, config constants, edge cases. Load only when explicitly referenced by development tasks.
 > - **L1 Anchor Principle **: Every section in L1 must have a corresponding hyperlink entry in this file. Strictly prohibited from having "orphaned content" in L1 that is completely unmentioned in L0.
 
 ---
@@ -37,7 +37,7 @@
 |  13   | [Future](#13-future-considerations) *(optional)*                 | Extensibility, technical debt                                |
 |  14   | [Appendix](#14-appendix) *(optional)*                           | Glossary, references, change log                              |
 
-**L1 Implementation Layer** → [{system-id}.detail.md](./{system-id}.detail.md) (Load only during `/forge`)
+**L1 Implementation Layer** → [{system-id}.detail.md](./{system-id}.detail.md) (Load only during development tasks)
 > [§1 Config Constants](./{system-id}.detail.md) · [§2 Data Structures](./{system-id}.detail.md) · [§3 Algorithms](./{system-id}.detail.md) · [§4 Decision Trees](./{system-id}.detail.md) · [§5 Edge Cases](./{system-id}.detail.md)
 
 ---
@@ -275,7 +275,7 @@ classDiagram
 >
 > **Rules**:
 > - If decision already recorded in ADR, **only reference not copy**
-> - Reference format: `> **Decision source**: [ADR-XXX: Decision title](../03_ADR/ADR_XXX.md)`
+> - Reference format: `> **Decision source**: [ADR-XXX: Decision title](../ADR/ADR_XXX.md)`
 > - Only decisions specific to this system are detailed here
 >
 > **Self-check example**:
@@ -293,7 +293,7 @@ classDiagram
 >  **Correct** - Reference ADR:
 > ```markdown
 > ### 8.1 Database selection
-> > **Decision source**: [ADR-001: Tech Stack Selection](../03_ADR/ADR_001_TECH_STACK.md)
+> > **Decision source**: [ADR-001: Tech Stack Selection](../ADR/ADR_001_TECH_STACK.md)
 > >
 > > This system uses PostgreSQL defined in ADR-001.
 > >
@@ -304,7 +304,7 @@ classDiagram
 
 <!-- If this decision affects multiple systems, should be recorded in ADR -->
 
-> **Decision source**: [ADR-XXX: Decision title](../03_ADR/ADR_XXX.md)
+> **Decision source**: [ADR-XXX: Decision title](../ADR/ADR_XXX.md)
 >
 > This system implements design defined in ADR-XXX, decision rationale not repeated here.
 >
@@ -335,7 +335,7 @@ classDiagram
 <!-- Example: Decision referencing ADR -->
 ### 8.x Example: Database Selection (Reference ADR)
 
-> **Decision source**: [ADR-001: Tech Stack Selection](../03_ADR/ADR_001_TECH_STACK.md)
+> **Decision source**: [ADR-001: Tech Stack Selection](../ADR/ADR_001_TECH_STACK.md)
 >
 > This system uses PostgreSQL defined in ADR-001 as primary database.
 >
@@ -570,8 +570,8 @@ classDiagram
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [PostgreSQL Best Practices](https://wiki.postgresql.org/wiki/Don%27t_Do_This)
 - [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
-- [Architecture Overview](../02_ARCHITECTURE_OVERVIEW.md)
-- [ADR001: Tech Stack](../03_ADR/ADR001_TECH_STACK.md)
+- [Architecture Overview](../基于 DeepSeek 大模型的 AI 智能求职辅导平台概要设计说明书 V1.0.md)
+- [ADR001: Tech Stack](../ADR/ADR001_TECH_STACK.md)
 
 ### 14.4 Change Log
 

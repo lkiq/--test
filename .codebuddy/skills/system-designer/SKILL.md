@@ -142,7 +142,7 @@ Create `{system-id}.detail.md` if any rule is triggered:
 
 ## Template And Sections
 
-Use `.agents/skills/system-designer/references/system-design-template.md`.
+Use `references/system-design-template.md`（位于本 skill 同目录下）。
 
 **Required L0 sections 1-11**:
 
@@ -175,18 +175,18 @@ Use `.agents/skills/system-designer/references/system-design-template.md`.
 
 ## Handoff Checklist
 
-- [ ] `01`, `02`, relevant `03_ADR/*`, `_research`, and templates have been read.
+- [ ] PRD（`需求分析/`）、架构概要（`系统架构/`）、相关 `系统架构/ADR/*`、`_research` 与模板均已读取。
 - [ ] L0 exists and required sections 1-11 are complete.
 - [ ] L1 trigger rules were evaluated; if triggered, `.detail.md` exists and L0 links to it.
 - [ ] Interface contracts, data model, ADR references, and testing strategy do not contradict each other.
-- [ ] No legacy `.agent/` paths, emoji, or empty `TODO/TBD` placeholders remain.
+- [ ] No legacy `.agent/` / `.agents/` paths, emoji, or empty `TODO/TBD` placeholders remain.
 
 ---
 
 <completion_criteria>
-- `system_id` and `TARGET_DIR` were confirmed by the `/design-system` host.
-- Output follows `.agents/skills/output-contract/SKILL.md` for persistence and collaboration closure.
+- `system_id` 与输出目录（`系统架构/详细设计/`）已由调用方确认。
+- 输出遵循本 skill 内联的 output-contract 规则进行持久化与协作收尾。
 - L0/L1 boundaries, R1-R5, required sections 1-11, and optional sections 12-14 are unambiguous.
 - Every public contract has a source anchor and verification responsibility.
-- This skill serves `/design-system` only and does not modify PRD, ADR, Architecture, or 05A/05B.
+- 本 skill 仅服务于系统详细设计，不修改 PRD、ADR、架构概要或其他设计文档。
 </completion_criteria>

@@ -1,7 +1,7 @@
 # {System Name} — Implementation Details (L1)
 
 > **File Type**: L1 implementation layer · **Mapped L0**: [`{system-id}.md`](./{system-id}.md)
-> This file is loaded only when explicitly referenced by a `/forge` task. For daily reading and task planning, prioritize L0.
+> This file is loaded only when explicitly referenced by a development task. For daily reading and task planning, prioritize L0.
 > ** Island Check**: Every section in this file must have a corresponding hyperlink entry in L0; isolated content is forbidden.
 
 ---
