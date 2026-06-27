@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# MySQL runtime (too large)
+mysql-runtime/
+dump.rdb
+
+# Build outputs
+frontend/dist/
+*.log
+backend_log.txt
+run_output.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+$null
+temp_*
+query
+start
+
+# Docx generation temp
+docx_gen/
