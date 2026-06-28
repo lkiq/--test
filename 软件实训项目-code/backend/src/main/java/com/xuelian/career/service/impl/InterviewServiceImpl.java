@@ -262,7 +262,7 @@ public class InterviewServiceImpl implements InterviewService {
             params.put("history_qa", historyStr.length() > 0 ? historyStr.toString() : "（暂无历史问答）");
 
             String prompt = promptUtil.loadAndRender("mock_interview", params);
-            String response = deepSeekService.callAPI("你是一位资深技术面试官", prompt);
+            String response = deepSeekService.callAPI("你是一位资深技术面试官", prompt, 6000L, 256);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
 
             if (result != null && result.containsKey("question")) {
@@ -304,7 +304,7 @@ public class InterviewServiceImpl implements InterviewService {
             params.put("history_qa", historyStr.toString());
 
             String prompt = promptUtil.loadAndRender("mock_interview", params);
-            String response = deepSeekService.callAPI("你是一位资深技术面试官", prompt);
+            String response = deepSeekService.callAPI("你是一位资深技术面试官", prompt, 6000L, 768);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
 
             if (result != null && result.containsKey("totalScore")) {

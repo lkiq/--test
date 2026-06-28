@@ -95,7 +95,7 @@ public class CustomerServiceServiceImpl implements CustomerServiceService {
 
             // 使用缓存（相同问题+角色不重复请求）
             String cacheKey = "cs:" + userRole + ":" + Objects.hash(question);
-            String response = deepSeekService.callAPIWithCache(cacheKey, systemPrompt, prompt, 1800L);
+            String response = deepSeekService.callAPIWithCache(cacheKey, systemPrompt, prompt, 3600L, 512);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
 
             if (result != null && result.containsKey("answer")) {

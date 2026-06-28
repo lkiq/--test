@@ -1,0 +1,21 @@
+- [x] DeepSeekService 接口新增 `callAPI(sys, prompt, timeoutMs, maxTokens)` 重载方法
+- [x] DeepSeekService 接口新增 `callAPIWithCache(cacheKey, sys, prompt, ttlSeconds, maxTokens)` 重载方法
+- [x] DeepSeekServiceImpl 抽取 `doCallAPI(sys, prompt, timeoutMs, maxTokens, temperature)` 私有方法
+- [x] DeepSeekServiceImpl 原 `callAPI(sys, prompt)` 委托新方法（默认 5000ms + 512 token + temperature 0.3）
+- [x] DeepSeekServiceImpl 原 `callAPIWithCache(...)` 委托新方法（默认 512 token）
+- [x] DeepSeekServiceImpl `temperature` 从硬编码 0.7 改为参数传入
+- [x] DeepSeekServiceImpl `max_tokens` 从硬编码 4096 改为参数传入
+- [x] AppConfig 删除 `SimpleClientHttpRequestFactory` + `setReadTimeout(30000)`
+- [x] AppConfig 新增 `JdkClientHttpRequestFactory` + `HttpClient.newBuilder()`
+- [x] AppConfig 连接超时 3 秒、读取超时 6 秒配置正确
+- [x] AssessmentServiceImpl L260 传入 `5000L, 512`（测评建议）
+- [x] CareerExplorationServiceImpl L67 传入 `8000L, 768`（职业探索）
+- [x] InterviewServiceImpl L265 传入 `6000L, 256`（面试出题）
+- [x] InterviewServiceImpl L307 传入 `6000L, 768`（面试评价）
+- [x] ResumeServiceImpl L56 传入 `5000L, 512`（简历优化）
+- [x] CustomerServiceServiceImpl L98 传入 `3600L, 512`（智能客服）
+- [x] （可选）DeepSeekServiceImpl 新增 10 线程 daemon 线程池 `aiCallExecutor`
+- [x] （可选）`doCallAPI` 用 `CompletableFuture.supplyAsync` 包装同步调用
+- [x] （可选）新增 `@PreDestroy shutdown()` 方法销毁线程池
+- [x] `mvn compile` 编译通过，无错误
+- [ ] 改动合并为 1 个 Git commit

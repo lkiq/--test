@@ -53,7 +53,7 @@ public class ResumeServiceImpl implements ResumeService {
                 params.put("job_jd", job != null ? job.getJd() : "通用岗位");
                 params.put("skill_requirements", "");
                 String prompt = promptUtil.renderTemplate(template, params);
-                String response = deepSeekService.callAPI("你是一位简历优化专家", prompt);
+                String response = deepSeekService.callAPI("你是一位简历优化专家", prompt, 5000L, 512);
                 Map<String, Object> result = deepSeekService.parseJSONResponse(response);
                 if (result != null) {
                     ResumeOptimizeResponse resp = objectMapper.convertValue(result, ResumeOptimizeResponse.class);

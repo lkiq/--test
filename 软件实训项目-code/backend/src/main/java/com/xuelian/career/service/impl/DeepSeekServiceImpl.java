@@ -7,6 +7,7 @@ import com.xuelian.career.config.DeepSeekConfig;
 import com.xuelian.career.entity.AiCallLog;
 import com.xuelian.career.mapper.AiCallLogMapper;
 import com.xuelian.career.service.DeepSeekService;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,7 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
  * DeepSeek API 服务实现类
@@ -42,11 +43,86 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     /** API 可用状态缓存键 */
     private static final String AI_AVAILABLE_KEY = "ai:available";
 
+    /** AI 调用独立线程池（10 线程，daemon，隔离 Tomcat 线程） */
+    private final ExecutorService aiCallExecutor = Executors.newFixedThreadPool(10, r -> {
+        Thread t = new Thread(r, "ai-call-worker");
+        t.setDaemon(true);
+        return t;
+    });
+
     /**
-     * 调用 DeepSeek API（无缓存）
+     * 调用 DeepSeek API（无缓存）- 向后兼容，委托新重载方法
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @return API 返回的原始文本
      */
     @Override
     public String callAPI(String systemPrompt, String userPrompt) {
+        return callAPI(systemPrompt, userPrompt, 5000L, 512);
+    }
+
+    /**
+     * 调用 AI API（带超时和 max_tokens 配置）
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param timeoutMs    超时时间（毫秒）
+     * @param maxTokens    最大生成 token 数
+     * @return API 返回的原始文本
+     */
+    @Override
+    public String callAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens) {
+        return doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
+    }
+
+    /**
+     * 带 Redis 缓存的 API 调用 - 向后兼容，委托新重载方法
+     * 先查缓存 → 命中则返回 → 未命中则调 API → 结果存缓存
+     * @param cacheKey     缓存键
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param ttlSeconds   缓存秒数（null 则使用默认值）
+     * @return API 返回的原始文本
+     */
+    @Override
+    public String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, Long ttlSeconds) {
+        long ttl = (ttlSeconds != null && ttlSeconds > 0) ? ttlSeconds : deepSeekConfig.getCacheTtl();
+        return callAPIWithCache(cacheKey, systemPrompt, userPrompt, ttl, 512);
+    }
+
+    /**
+     * 带 cache 的 AI 调用（带超时和 max_tokens 配置）
+     * 先查缓存 → 命中则返回 → 未命中则调 API → 结果存缓存
+     * @param cacheKey     缓存键
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param ttlSeconds   缓存秒数（兼作超时控制的 TTL）
+     * @param maxTokens    最大生成 token 数
+     * @return API 返回的原始文本
+     */
+    @Override
+    public String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, long ttlSeconds, int maxTokens) {
+        String redisKey = AI_CACHE_PREFIX + cacheKey;
+        Object cached = redisTemplate.opsForValue().get(redisKey);
+        if (cached != null) {
+            log.info("AI 缓存命中: cacheKey={}", cacheKey);
+            return cached.toString();
+        }
+        String result = doCallAPI(systemPrompt, userPrompt, 5000L, maxTokens, 0.3);
+        redisTemplate.opsForValue().set(redisKey, result, ttlSeconds, TimeUnit.SECONDS);
+        return result;
+    }
+
+    /**
+     * 核心 AI 调用逻辑（私有方法）
+     * 构建 HTTP 请求并通过独立线程池异步发送，支持超时控制和异常隔离
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param timeoutMs    超时时间（毫秒）- 用于日志记录与异步等待
+     * @param maxTokens    最大生成 token 数
+     * @param temperature  采样温度（结构化 0.3 / 对话 0.6）
+     * @return AI 返回内容
+     */
+    private String doCallAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature) {
         long startTime = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
         callLog.setScene("AI_CALL");
@@ -86,25 +162,41 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             messages.add(userMsg);
 
             requestBody.put("messages", messages);
-            requestBody.put("temperature", 0.7);
-            requestBody.put("max_tokens", 4096);
+            requestBody.put("temperature", temperature);
+            requestBody.put("max_tokens", maxTokens);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
             log.debug("调用 DeepSeek API: model={}, promptLength={}", deepSeekConfig.getModel(), userPrompt.length());
 
-            // 发送请求
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    deepSeekConfig.getApiUrl(),
-                    HttpMethod.POST,
-                    entity,
-                    Map.class
-            );
+            // 异步发送请求（带超时控制，隔离 Tomcat 线程）
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                ResponseEntity<Map> response = restTemplate.exchange(
+                        deepSeekConfig.getApiUrl(),
+                        HttpMethod.POST,
+                        entity,
+                        Map.class
+                );
+                return extractContent(response.getBody());
+            }, aiCallExecutor);
+
+            String content;
+            try {
+                content = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                throw new RestClientException("AI 调用超时: " + timeoutMs + "ms");
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                if (cause instanceof RestClientException) throw (RestClientException) cause;
+                throw new RestClientException("AI 调用异常: " + cause.getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RestClientException("AI 调用被中断");
+            }
 
             long duration = System.currentTimeMillis() - startTime;
 
-            // 解析响应
-            String content = extractContent(response.getBody());
             log.info("DeepSeek API 调用成功: duration={}ms, responseLength={}", duration,
                     content != null ? content.length() : 0);
 
@@ -135,31 +227,6 @@ public class DeepSeekServiceImpl implements DeepSeekService {
 
             throw new RuntimeException("AI 服务暂时不可用，请稍后重试", e);
         }
-    }
-
-    /**
-     * 带 Redis 缓存的 API 调用
-     * 先查缓存 → 命中则返回 → 未命中则调 API → 结果存缓存
-     */
-    @Override
-    public String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, Long ttlSeconds) {
-        String redisKey = AI_CACHE_PREFIX + cacheKey;
-
-        // 查缓存
-        Object cached = redisTemplate.opsForValue().get(redisKey);
-        if (cached != null) {
-            log.info("AI 缓存命中: cacheKey={}", cacheKey);
-            return cached.toString();
-        }
-
-        // 调 API
-        String result = callAPI(systemPrompt, userPrompt);
-
-        // 存缓存
-        long ttl = (ttlSeconds != null && ttlSeconds > 0) ? ttlSeconds : deepSeekConfig.getCacheTtl();
-        redisTemplate.opsForValue().set(redisKey, result, ttl, TimeUnit.SECONDS);
-
-        return result;
     }
 
     /**
@@ -259,6 +326,22 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             aiCallLogMapper.insert(callLog);
         } catch (Exception e) {
             log.warn("保存 AI 调用日志失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 销毁 AI 调用线程池
+     */
+    @PreDestroy
+    public void shutdown() {
+        aiCallExecutor.shutdown();
+        try {
+            if (!aiCallExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                aiCallExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            aiCallExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
         }
     }
 }

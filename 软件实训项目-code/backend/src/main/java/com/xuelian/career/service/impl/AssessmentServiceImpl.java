@@ -257,7 +257,7 @@ public class AssessmentServiceImpl implements AssessmentService {
             params.put("score_data", scoreData.toString());
 
             String prompt = promptUtil.loadAndRender("assessment_analysis", params);
-            String response = deepSeekService.callAPI("你是一位专业的职业能力测评分析师", prompt);
+            String response = deepSeekService.callAPI("你是一位专业的职业能力测评分析师", prompt, 5000L, 512);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
 
             if (result != null && result.containsKey("strengthAnalysis")) {
