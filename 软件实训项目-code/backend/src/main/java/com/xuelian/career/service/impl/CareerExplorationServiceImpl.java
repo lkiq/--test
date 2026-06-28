@@ -63,8 +63,9 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
                     String convHistory = buildConversationHistory(req.getHistory());
                     params.put("conversation_history", convHistory);
                     String prompt = promptUtil.renderTemplate(template, params);
-                    String cacheKey = buildCacheKey(userId, req);
-                    String response = deepSeekService.callAPIWithCache(cacheKey, "你是一位资深的职业规划导师", prompt, 3600L, 8000L, 768);
+                    // 对话式场景不使用缓存：用户每次输入不同问题，应实时生成不同回复
+                    // 原 callAPIWithCache 缓存 3600s，导致不同问题命中旧缓存返回相同答案
+                    String response = deepSeekService.callAPI("你是一位资深的职业规划导师", prompt, 8000L, 768);
                     Map<String, Object> result = deepSeekService.parseJSONResponse(response);
                     if (result != null && result.containsKey("directions")) {
                         CareerDirectionResponse resp = objectMapper.convertValue(result, CareerDirectionResponse.class);

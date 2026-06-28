@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -94,7 +97,8 @@ public class CustomerServiceServiceImpl implements CustomerServiceService {
             String systemPrompt = "你是一位求职辅导平台的智能客服助手，请严格按照JSON格式返回回答。";
 
             // 使用缓存（相同问题+角色不重复请求）
-            String cacheKey = "cs:" + userRole + ":" + Objects.hash(question);
+            // cacheKey 用 question 的 SHA-256，避免 Objects.hash(int) 冲突导致不同问题命中同一缓存
+            String cacheKey = "cs:" + userRole + ":" + sha256Hex(question != null ? question : "");
             String response = deepSeekService.callAPIWithCache(cacheKey, systemPrompt, prompt, 3600L, 512);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
 
@@ -141,5 +145,24 @@ public class CustomerServiceServiceImpl implements CustomerServiceService {
                 return faq;
         }
         return null;
+    }
+
+    /**
+     * 计算字符串的 SHA-256 十六进制摘要（用于生成唯一缓存键）
+     * @param input 输入字符串
+     * @return 64 位十六进制哈希字符串
+     */
+    private String sha256Hex(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                hexString.append(String.format("%02x", b));
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            return Integer.toHexString(input.hashCode());
+        }
     }
 }
