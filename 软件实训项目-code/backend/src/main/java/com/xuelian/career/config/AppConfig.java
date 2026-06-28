@@ -24,7 +24,7 @@ public class AppConfig {
     @Bean
     public RestTemplate restTemplate() {
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(3))      // 连接超时 3 秒
+                .connectTimeout(Duration.ofSeconds(4))      // 连接超时 4 秒（首次 TCP 握手更宽松，仍小于 5s 业务超时）
                 .executor(Executors.newFixedThreadPool(10)) // 底层异步线程池
                 .build();
 

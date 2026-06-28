@@ -47,6 +47,18 @@ public interface DeepSeekService {
     String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, long ttlSeconds, int maxTokens);
 
     /**
+     * 带缓存的 API 调用（完整参数：超时 + max_tokens）
+     * @param cacheKey     缓存键
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param ttlSeconds   缓存秒数
+     * @param timeoutMs    业务超时时间（毫秒）
+     * @param maxTokens    最大生成 token 数
+     * @return API 返回的原始文本
+     */
+    String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, long ttlSeconds, long timeoutMs, int maxTokens);
+
+    /**
      * 解析 API 返回的 JSON 字符串为 Map
      * @param response API 原始响应文本
      * @return 解析后的 Map

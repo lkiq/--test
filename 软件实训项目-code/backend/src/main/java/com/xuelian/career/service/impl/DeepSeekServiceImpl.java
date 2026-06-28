@@ -101,13 +101,29 @@ public class DeepSeekServiceImpl implements DeepSeekService {
      */
     @Override
     public String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, long ttlSeconds, int maxTokens) {
+        return callAPIWithCache(cacheKey, systemPrompt, userPrompt, ttlSeconds, 5000L, maxTokens);
+    }
+
+    /**
+     * 带 cache 的 AI 调用（完整参数：超时 + max_tokens）
+     * 先查缓存 → 命中则返回 → 未命中则调 API → 结果存缓存
+     * @param cacheKey     缓存键
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param ttlSeconds   缓存秒数
+     * @param timeoutMs    业务超时时间（毫秒）
+     * @param maxTokens    最大生成 token 数
+     * @return API 返回的原始文本
+     */
+    @Override
+    public String callAPIWithCache(String cacheKey, String systemPrompt, String userPrompt, long ttlSeconds, long timeoutMs, int maxTokens) {
         String redisKey = AI_CACHE_PREFIX + cacheKey;
         Object cached = redisTemplate.opsForValue().get(redisKey);
         if (cached != null) {
             log.info("AI 缓存命中: cacheKey={}", cacheKey);
             return cached.toString();
         }
-        String result = doCallAPI(systemPrompt, userPrompt, 5000L, maxTokens, 0.3);
+        String result = doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
         redisTemplate.opsForValue().set(redisKey, result, ttlSeconds, TimeUnit.SECONDS);
         return result;
     }

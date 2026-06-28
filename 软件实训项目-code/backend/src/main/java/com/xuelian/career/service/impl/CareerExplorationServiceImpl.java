@@ -64,7 +64,7 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
                     params.put("conversation_history", convHistory);
                     String prompt = promptUtil.renderTemplate(template, params);
                     String cacheKey = buildCacheKey(userId, req);
-                    String response = deepSeekService.callAPIWithCache(cacheKey, "你是一位资深的职业规划导师", prompt, 8000L, 768);
+                    String response = deepSeekService.callAPIWithCache(cacheKey, "你是一位资深的职业规划导师", prompt, 3600L, 8000L, 768);
                     Map<String, Object> result = deepSeekService.parseJSONResponse(response);
                     if (result != null && result.containsKey("directions")) {
                         CareerDirectionResponse resp = objectMapper.convertValue(result, CareerDirectionResponse.class);
