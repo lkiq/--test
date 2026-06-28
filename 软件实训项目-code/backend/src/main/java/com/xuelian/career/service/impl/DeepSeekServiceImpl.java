@@ -7,9 +7,13 @@ import com.xuelian.career.config.DeepSeekConfig;
 import com.xuelian.career.entity.AiCallLog;
 import com.xuelian.career.mapper.AiCallLogMapper;
 import com.xuelian.career.service.DeepSeekService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -36,6 +40,14 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final AiCallLogMapper aiCallLogMapper;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 自注入代理，用于让 @Retry/@CircuitBreaker 注解在内部调用时生效
+     * （Spring AOP 基于代理，this.doCallAPI() 不走代理，需通过 self.doCallAPI() 调用）
+     */
+    @Autowired
+    @Lazy
+    private DeepSeekServiceImpl self;
 
     /** Redis 缓存键前缀 */
     private static final String AI_CACHE_PREFIX = "ai:cache:";
@@ -71,7 +83,7 @@ public class DeepSeekServiceImpl implements DeepSeekService {
      */
     @Override
     public String callAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens) {
-        return doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
+        return self.doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
     }
 
     /**
@@ -123,13 +135,13 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             log.info("AI 缓存命中: cacheKey={}", cacheKey);
             return cached.toString();
         }
-        String result = doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
+        String result = self.doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, 0.3);
         redisTemplate.opsForValue().set(redisKey, result, ttlSeconds, TimeUnit.SECONDS);
         return result;
     }
 
     /**
-     * 核心 AI 调用逻辑（私有方法）
+     * 核心 AI 调用逻辑（public，供 Resilience4j AOP 代理重试+熔断）
      * 构建 HTTP 请求并通过独立线程池异步发送，支持超时控制和异常隔离
      * @param systemPrompt 系统提示词
      * @param userPrompt   用户提示词
@@ -138,7 +150,9 @@ public class DeepSeekServiceImpl implements DeepSeekService {
      * @param temperature  采样温度（结构化 0.3 / 对话 0.6）
      * @return AI 返回内容
      */
-    private String doCallAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature) {
+    @Retry(name = "ai-call", fallbackMethod = "retryFallback")
+    @CircuitBreaker(name = "ai-call", fallbackMethod = "circuitFallback")
+    public String doCallAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature) {
         long startTime = System.currentTimeMillis();
         AiCallLog callLog = new AiCallLog();
         callLog.setScene("AI_CALL");
@@ -241,8 +255,29 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             // 标记 API 不可用
             redisTemplate.opsForValue().set(AI_AVAILABLE_KEY, false, 60, TimeUnit.SECONDS);
 
-            throw new RuntimeException("AI 服务暂时不可用，请稍后重试", e);
+            // 重新抛出原始 RestClientException，以便 @Retry 能捕获并重试
+            throw e;
         }
+    }
+
+    /**
+     * 重试耗尽后的兜底方法
+     * 由 Resilience4j @Retry 在 max-attempts 用尽后调用
+     * 抛出异常由业务层 catch 后走 FALLBACK
+     */
+    private String retryFallback(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature, Throwable t) {
+        log.warn("AI 调用重试耗尽（max-attempts=3），走兜底: {}", t.getMessage());
+        throw new RuntimeException("AI 服务重试后仍失败: " + t.getMessage(), t);
+    }
+
+    /**
+     * 熔断器 OPEN 期间的兜底方法
+     * 由 Resilience4j @CircuitBreaker 在熔断开启时调用
+     * 返回 null，业务层收到 null 后走 FALLBACK
+     */
+    private String circuitFallback(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature, Throwable t) {
+        log.warn("AI 熔断器开启，跳过 AI 调用直接走兜底: {}", t.getMessage());
+        return null;
     }
 
     /**
