@@ -252,8 +252,9 @@ public class DeepSeekServiceImpl implements DeepSeekService {
             callLog.setFallbackReason("API不可用: " + e.getMessage());
             saveCallLog(callLog);
 
-            // 标记 API 不可用
-            redisTemplate.opsForValue().set(AI_AVAILABLE_KEY, false, 60, TimeUnit.SECONDS);
+            // 不再设置 ai:available=false（原 60s 锁死导致后续全兜底）
+            // 熔断由 @CircuitBreaker 管理（5次失败才开熔断，30s半开探测）
+            // 重试由 @Retry 管理（max-attempts=3，间隔200ms）
 
             // 重新抛出原始 RestClientException，以便 @Retry 能捕获并重试
             throw e;

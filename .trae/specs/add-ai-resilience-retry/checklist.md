@@ -1,0 +1,34 @@
+- [x] `backend/pom.xml` 新增 `resilience4j-spring-boot3` v2.2.0 依赖 + `spring-boot-starter-aop`
+- [x] `application-dev.yml` 新增 `resilience4j.retry.instances.ai-call`（max-attempts=3, wait-duration=200ms）
+- [x] `application-dev.yml` 新增 `resilience4j.circuitbreaker.instances.ai-call`（failureRateThreshold=50%, slidingWindowSize=10, minimumNumberOfCalls=5, waitDurationInOpenState=30s）
+- [x] `DeepSeekServiceImpl.doCallAPI` 加 `@Retry(name="ai-call", fallbackMethod="retryFallback")` 注解
+- [x] `DeepSeekServiceImpl.doCallAPI` 加 `@CircuitBreaker(name="ai-call", fallbackMethod="circuitFallback")` 注解
+- [x] 新增 `retryFallback` 方法：重试耗尽时抛异常由业务层兜底
+- [x] 新增 `circuitFallback` 方法：熔断 OPEN 时返回 null 触发业务层兜底
+- [x] doCallAPI 从 private 改为 public（AOP 代理要求）
+- [x] catch 块重抛 RestClientException（让 @Retry 能捕获重试）
+- [x] 自注入 @Autowired @Lazy self 字段，doCallAPI 调用改为 self.doCallAPI（解决自调用 AOP 不生效）
+- [x] 新建 ResilienceConfig.java，CircuitBreaker 状态切换（OPEN/CLOSED/HALF_OPEN）输出 INFO 日志
+- [x] 熔断调用被拒绝输出 WARN 日志
+- [x] `mvn compile -q` 编译通过（退出码 0）
+- [x] `mvn package -DskipTests -q` 打包成功
+- [x] 连续 10 次职业探索 AI 成功率 10/10 (100%) ≥ 90% 目标
+- [x] 智能客服调用验证 AI 调用成功（2150ms，source=AI），注解通过 self 代理生效
+- [x] 改动合并为 1 个 Git commit
+
+## 修复：ai:available=false 60 秒锁死与 @CircuitBreaker 冲突
+
+- [x] 移除 `DeepSeekServiceImpl` catch 块中 `redisTemplate.opsForValue().set(AI_AVAILABLE_KEY, false, 60, TimeUnit.SECONDS)`（单次失败即锁死 60s，导致后续全 FALLBACK，与 @CircuitBreaker 5 次失败才开熔断的语义冲突）
+- [x] 熔断改由 `@CircuitBreaker` 统一管理（failure-rate-threshold=50%, minimum-number-of-calls=5, wait-duration-in-open-state=30s）
+- [x] 重试由 `@Retry` 统一管理（max-attempts=3, wait-duration=200ms）
+- [x] catch 块重抛 RestClientException，让 @Retry 能捕获并重试
+- [x] `mvn package -DskipTests -q` 重新打包成功
+- [x] 后端重启成功（18.566s 启动）
+- [x] 直连 DeepSeek API 5 次：全部成功，耗时 1059-1536ms（平均 1371ms），API 健康
+- [x] 后端客服接口 5 次（token 鉴权 + 不同问题绕过缓存）：0 次 FALLBACK（修复前 4/5 FALLBACK）
+  - Q1 2030ms source=AI（真实 AI 调用）
+  - Q2 1689ms source=AI（真实 AI 调用）
+  - Q3 31ms source=AI（缓存命中）
+  - Q4 20ms source=AI（缓存命中）
+  - Q5 1606ms source=FAQ（FAQ 知识库命中）
+- [x] AI 调用耗时 1.6-2.0s，全部在 5 秒目标内
