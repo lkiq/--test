@@ -87,6 +87,21 @@ public class DeepSeekServiceImpl implements DeepSeekService {
     }
 
     /**
+     * 调用 AI API（带超时、max_tokens 和 temperature 配置）
+     * 通过 self 代理调用 doCallAPI，确保 @Retry/@CircuitBreaker 注解生效
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param timeoutMs    超时时间（毫秒）
+     * @param maxTokens    最大生成 token 数
+     * @param temperature  采样温度（结构化 0.3 / 对话 0.7）
+     * @return API 返回的原始文本
+     */
+    @Override
+    public String callAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature) {
+        return self.doCallAPI(systemPrompt, userPrompt, timeoutMs, maxTokens, temperature);
+    }
+
+    /**
      * 带 Redis 缓存的 API 调用 - 向后兼容，委托新重载方法
      * 先查缓存 → 命中则返回 → 未命中则调 API → 结果存缓存
      * @param cacheKey     缓存键

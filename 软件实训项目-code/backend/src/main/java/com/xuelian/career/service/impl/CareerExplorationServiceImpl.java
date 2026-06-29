@@ -66,7 +66,14 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
                 // 通用问答失败时降级到职业推荐逻辑
             }
 
-            // 3. 职业方向推荐：保持原有 directions JSON 格式与业务逻辑
+            // 3. 职业方向推荐：无画像/匿名用户降级到通用咨询，避免空数据生成无效推荐
+            if (profile == null) {
+                log.info("用户 {} 无画像数据，RECOMMENDATION 降级到 GENERAL_QA", userId);
+                CareerDirectionResponse generalResp = answerGeneralQuestion(userId, req, profile, latestResult, positions);
+                if (generalResp != null) {
+                    return generalResp;
+                }
+            }
             return doCareerRecommendation(userId, req, profile, latestResult, positions);
 
         } catch (Exception e) {
@@ -88,7 +95,7 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
             String prompt = promptUtil.renderTemplate(template, params);
 
             // 对话式场景不使用缓存：用户每次输入不同问题，应实时生成不同回复
-            String response = deepSeekService.callAPI("你是一位资深的职业规划导师", prompt, 8000L, 768);
+            String response = deepSeekService.callAPI("你是一位资深的职业规划导师", prompt, 8000L, 768, 0.3);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
             if (result != null && result.containsKey("directions")) {
                 CareerDirectionResponse resp = objectMapper.convertValue(result, CareerDirectionResponse.class);
@@ -123,7 +130,7 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
             params.put("question", question);
             String prompt = promptUtil.renderTemplate(template, params);
 
-            String response = deepSeekService.callAPI("你是一位资深的职业规划导师", prompt, 8000L, 768);
+            String response = deepSeekService.callAPI("你是一位以职业规划见长的AI助手", prompt, 8000L, 768, 0.7);
             Map<String, Object> result = deepSeekService.parseJSONResponse(response);
             if (result != null && result.containsKey("answer")) {
                 String answer = (String) result.get("answer");
@@ -246,7 +253,7 @@ public class CareerExplorationServiceImpl implements CareerExplorationService {
     private boolean isLikelyGeneralQuestion(String question) {
         if (question == null || question.isBlank()) return false;
         String q = question.toLowerCase();
-        String[] generalKeywords = {"趋势", "发展", "前景", "薪资", "工资", "面试", "简历", "学习", "怎么学",
+        String[] generalKeywords = {"趋势", "发展", "前景", "薪资", "工资", "面试", "简历",
                 "如何准备", "行业", "公司", "企业", "offer", "跳槽", "转行", "加班", "福利"};
         for (String kw : generalKeywords) {
             if (q.contains(kw)) return true;

@@ -36,6 +36,18 @@ public interface DeepSeekService {
     String callAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens);
 
     /**
+     * 调用 DeepSeek API（带超时、max_tokens 和 temperature 配置）
+     * 用于差异化生成策略：结构化 JSON 用 0.3，自由问答用 0.7
+     * @param systemPrompt 系统提示词
+     * @param userPrompt   用户提示词
+     * @param timeoutMs    超时时间（毫秒）
+     * @param maxTokens    最大生成 token 数
+     * @param temperature  采样温度（0.0-2.0，结构化输出建议 0.3，自由问答建议 0.7）
+     * @return API 返回的原始文本
+     */
+    String callAPI(String systemPrompt, String userPrompt, long timeoutMs, int maxTokens, double temperature);
+
+    /**
      * 带缓存的 API 调用（带超时和 max_tokens 配置）
      * @param cacheKey     缓存键
      * @param systemPrompt 系统提示词
