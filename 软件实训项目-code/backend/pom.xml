@@ -134,15 +134,16 @@
             <version>5.1.0</version>
         </dependency>
 
-        <!-- Resilience4j 韧性增强（重试+熔断） -->
+        <!-- Resilience4j（AI 调用熔断 + 重试，DeepSeekServiceImpl/ResilienceConfig 使用） -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
             <version>2.2.0</version>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-reactor</artifactId>
+            <version>2.2.0</version>
         </dependency>
     </dependencies>
 

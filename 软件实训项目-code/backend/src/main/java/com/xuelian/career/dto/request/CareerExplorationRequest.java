@@ -15,4 +15,7 @@ public class CareerExplorationRequest {
 
     /** 对话历史（可选），每项包含 role 和 content */
     private List<Map<String, String>> history;
+
+    /** 来源：ASSESSMENT（从测评页进入）、EXPLORE（单独探索） */
+    private String source;
 }

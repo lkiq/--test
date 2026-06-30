@@ -58,11 +58,18 @@ async function toggleStatus(user: any) {
   fetchUsers()
 }
 
+/**
+ * 重置用户密码，弹窗让管理员输入新密码
+ */
 async function resetPwd(user: any) {
   try {
-    await ElMessageBox.prompt('请输入新密码', '重置密码', { confirmButtonText: '确定' })
-    await resetUserPassword(user.id, '123456')
-    ElMessage.success(`密码已重置为 123456`)
+    const { value } = await ElMessageBox.prompt('请输入新密码', '重置密码', {
+      confirmButtonText: '确定',
+      inputPattern: /^.{6,}$/,
+      inputErrorMessage: '密码长度不能少于6位'
+    })
+    await resetUserPassword(user.id, value)
+    ElMessage.success(`密码已重置`)
   } catch {/* 取消 */}
 }
 

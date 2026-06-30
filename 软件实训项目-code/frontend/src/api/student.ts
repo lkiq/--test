@@ -12,6 +12,8 @@ export const getAssessmentResult = (id: number) => request.get(`/student/assessm
 export const getAssessmentHistory = () => request.get('/student/assessment/history')
 
 export const exploreCareer = (data: any) => request.post('/student/career/explore', data)
+export const exploreFromAssessment = (resultId: number) =>
+  request.post(`/student/career/explore/from-assessment/${resultId}`, {})
 export const getExploreHistory = () => request.get('/student/career/explore/history')
 
 export const recommendJobs = () => request.post('/student/jobs/recommend')

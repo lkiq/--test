@@ -10,11 +10,22 @@
 
 ## 一、问题根因回顾（3 个层面）
 
+> ⚠️ **校正说明**：本表已基于实际代码校正（2026-06-28），原版根因分析与代码不符，详见第八章校正记录。
+
+| # | 根因 | 现状代码（已校正） | 影响 |
+|---|------|----------|------|
+| 1 | **max_tokens=4096 过大**，生成需 15-30 秒；读取超时 30 秒过长 | [DeepSeekServiceImpl.java#L90](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L90) `max_tokens=4096` + [AppConfig.java#L22](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/config/AppConfig.java#L22) `setReadTimeout(30000)` | 用户等 30 秒才报错，生成耗时远超用户容忍 |
+| 2 | **SimpleClientHttpRequestFactory 无连接池**，TCP+TLS 重复握手 | [AppConfig.java#L20](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/config/AppConfig.java#L20) `new SimpleClientHttpRequestFactory()` | 每次多耗 300-800ms（已用注入单例，非 new 问题） |
+| 3 | **同步阻塞占用 Tomcat 线程**，无异步隔离 | [DeepSeekServiceImpl.java#L97-L102](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L97-L102) 同步 `restTemplate.exchange` | Tomcat 默认 200 线程，并发 20 个 AI 调用即线程紧张 |
+
+**补充根因（实际代码额外发现）**：
+
 | # | 根因 | 现状代码 | 影响 |
 |---|------|----------|------|
-| 1 | 硬超时 3 秒太短，max_tokens 1024 生成需 5-8 秒 | [DeepSeekServiceImpl.java#L52](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L52) `3000L` + [L89](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L89) `max_tokens=1024` | 所有调用必然超时，全走兜底 |
-| 2 | 每次 `new RestTemplate`，无连接池，TCP+TLS 重复握手 | [L99-L102](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L99-L102) | 每次多耗 300-800ms |
-| 3 | CompletableFuture 用 ForkJoinPool，2 核服务器仅 1 线程 | [L97](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L97) | 并发调用排队，雪崩风险 |
+| 4 | **temperature=0.7 偏高** | [DeepSeekServiceImpl.java#L89](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L89) | 生成内容偏发散，结构化场景应降到 0.3 |
+| 5 | **业务调用方无差异化参数** | 6 个调用方全用 `callAPI(sys, prompt)` | 所有场景统一 4096，无法按场景调优 |
+| 6 | **API Key 硬编码** | [application-dev.yml#L45](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/resources/application-dev.yml#L45) | 安全问题，技术栈 P0 已识别 |
+| 7 | **DeepSeekConfig.timeoutSeconds=60 配置失效** | [DeepSeekConfig.java#L24](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/config/DeepSeekConfig.java#L24) 字段存在但 AppConfig 未读取 | 配置中心形同虚设，实际用硬编码 30000ms |
 
 ---
 
@@ -30,18 +41,18 @@
 
 **文件**：[DeepSeekServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java)
 
-**改动内容**：
+**改动内容**（已校正行号）：
 
 ```java
-// L51-L53：默认超时 3000 → 5000
+// L49-L50：默认超时改为通过重载传入（原方法无超时参数）
 @Override
 public String callAPI(String systemPrompt, String userPrompt) {
-    return callAPI(systemPrompt, userPrompt, 5000L);  // 3秒 → 5秒
+    return callAPI(systemPrompt, userPrompt, 5000L, 512);  // 新增重载，默认 5 秒 + 512 token
 }
 
-// L89：max_tokens 改为差异化配置（见下方调用方表）
-requestBody.put("temperature", 0.6);
-// max_tokens 由调用方通过新增重载方法传入，不再硬编码 1024
+// L89-L90：temperature 0.7→0.3（结构化场景）/ 0.6（对话场景）；max_tokens 4096→差异化
+requestBody.put("temperature", 0.3);  // 0.7→0.3，结构化输出更稳定
+// max_tokens 由调用方通过新增重载方法传入，不再硬编码 4096
 ```
 
 **差异化 max_tokens 与超时配置**（采纳建议：512 用于结构化输出，768 用于面试评价）：
@@ -55,22 +66,24 @@ requestBody.put("temperature", 0.6);
 | 职业探索 | 768 | 8000ms（走缓存） | 长文本推荐，768 平衡速度与完整度 |
 | 智能客服 | 512 | 5000ms | 结构化回答，512 足够 |
 
-**业务调用方改造**（需新增带 max_tokens 的重载方法）：
+**业务调用方改造**（需新增带 max_tokens 的重载方法；行号已校正）：
 
 | 文件 | 行号 | 当前 | 改为 | 场景 |
 |------|------|------|------|------|
-| [AssessmentServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/AssessmentServiceImpl.java) | L259 | `callAPI(sys, prompt, 3000L)` | `callAPI(sys, prompt, 5000L, 512)` | 测评建议 |
-| [CareerExplorationServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/CareerExplorationServiceImpl.java) | L61 | `callAPIWithCache(...)` | `callAPIWithCache(..., 8000L, 768)` | 职业探索 |
-| [InterviewServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/InterviewServiceImpl.java) | L235 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 6000L, 256)` | 面试出题 |
-| [InterviewServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/InterviewServiceImpl.java) | L277 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 6000L, 768)` | 面试评价 |
+| [AssessmentServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/AssessmentServiceImpl.java) | L260 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 5000L, 512)` | 测评建议 |
+| [CareerExplorationServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/CareerExplorationServiceImpl.java) | L67 | `callAPIWithCache(...)` | `callAPIWithCache(..., 8000L, 768)` | 职业探索 |
+| [InterviewServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/InterviewServiceImpl.java) | L265 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 6000L, 256)` | 面试出题 |
+| [InterviewServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/InterviewServiceImpl.java) | L307 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 6000L, 768)` | 面试评价 |
 | [ResumeServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/ResumeServiceImpl.java) | L56 | `callAPI(sys, prompt)` | `callAPI(sys, prompt, 5000L, 512)` | 简历优化 |
 | [CustomerServiceServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/CustomerServiceServiceImpl.java) | L98 | `callAPIWithCache(..., 1800L)` | `callAPIWithCache(..., 3600L, 512)` | 智能客服 |
 
-#### 改动 1.2：隔离 AI 调用线程池（10 线程）
+#### 改动 1.2：隔离 AI 调用线程池（10 线程，可选异步化）
 
 **文件**：[DeepSeekServiceImpl.java](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java)
 
-**改动内容**：
+**实际代码现状**（已校正）：[L97-L102](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L97-L102) 是**同步阻塞调用**，直接 `restTemplate.exchange`，无 `CompletableFuture`，无 `new RestTemplate`（已用注入单例）。
+
+**改动内容**（已校正）：
 
 ```java
 // 新增字段（类顶部，L40 附近）
@@ -81,9 +94,11 @@ private final ExecutorService aiCallExecutor = Executors.newFixedThreadPool(10, 
     return t;
 });
 
-// L97：supplyAsync 传入独立线程池
+// L97-L102：将同步调用改为异步（用 CompletableFuture 包装现有同步逻辑）
+// 原代码：ResponseEntity<Map> response = restTemplate.exchange(...) 直接返回
+// 改为：
 CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
-    // 直接复用注入的连接池 RestTemplate（不再 new）
+    // 复用注入的连接池 RestTemplate（AppConfig 改造后即为连接池）
     ResponseEntity<Map> response = restTemplate.exchange(
             deepSeekConfig.getApiUrl(),
             HttpMethod.POST,
@@ -91,7 +106,7 @@ CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
             Map.class
     );
     return extractContent(response.getBody());
-}, aiCallExecutor);  // ← 独立线程池 + 复用注入的 RestTemplate
+}, aiCallExecutor);  // ← 独立线程池，隔离 Tomcat 线程
 
 // 新增 @PreDestroy 销毁方法（类底部）
 @PreDestroy
@@ -108,11 +123,13 @@ public void shutdown() {
 }
 ```
 
-**关键改动**（合并第一阶段线程池 + 第二阶段连接池）：
+**关键改动**（已校正，合并第一阶段线程池 + 第二阶段连接池）：
 - 新增 `aiCallExecutor`（10 线程，daemon）
-- `CompletableFuture.supplyAsync` 传入 `aiCallExecutor`
-- **删除** L99-L102 的 `new SimpleClientHttpRequestFactory` + `new RestTemplate`
-- 改用类顶部已注入的 `private final RestTemplate restTemplate`（来自 AppConfig 的连接池 Bean）
+- 将 [L97-L102](file:///d:/HuaweiMoveData/Users/20403/Desktop/软件实训项目/软件实训项目-code/backend/src/main/java/com/xuelian/career/service/impl/DeepSeekServiceImpl.java#L97-L102) 同步调用用 `CompletableFuture.supplyAsync(..., aiCallExecutor)` 包装
+- **无需删除 `new RestTemplate`**（实际代码已是注入单例，原描述有误）
+- AppConfig 改造后（改动 1.3），注入的 `restTemplate` 即为连接池版本
+
+**异步化说明**：实际代码是同步阻塞，改为 CompletableFuture 后，Controller 层调用 `future.get(5, TimeUnit.SECONDS)` 获取结果，超时走兜底。如保持同步也可（改动量更小），但无法隔离 Tomcat 线程。
 
 #### 改动 1.3：AppConfig 改造 RestTemplate Bean（JdkClientHttpRequestFactory）
 
@@ -454,3 +471,57 @@ GROUP BY response_source;
 | 决策 2 实现细节 | 补充「JdkClientHttpRequestFactory 连接池替代 SimpleClientHttpRequestFactory」 |
 | 第三章 P1 路线图 | 补充「独立线程池 10 线程 + @PreDestroy 销毁」 |
 | 第三章 P2 路线图 | 补充「PromptOptimizer 工具类 + 缓存 TTL 6 小时」 |
+
+---
+
+## 八、实际代码校正记录（2026-06-28）
+
+> **校正背景**：在 Plan 模式下探索实际代码后发现，本文档原版根因分析与实际代码严重不符，已校正。本章节记录校正内容，便于追溯。
+
+### 8.1 校正前的失实描述
+
+原版文档基于错误假设编写，与实际代码存在 7 处差异：
+
+| # | 原文档描述 | 实际代码 | 校正动作 |
+|---|-----------|----------|----------|
+| 1 | 硬超时 3000ms（DeepSeekServiceImpl L52） | 无硬超时；AppConfig 读取超时 30000ms | 根因 1 改为「max_tokens=4096 + 读取超时 30 秒」 |
+| 2 | max_tokens=1024（L89） | max_tokens=4096（L90） | 改动 1.1 改为「4096→差异化」 |
+| 3 | temperature=0.6 | temperature=0.7（L89） | 改动 1.1 补充「0.7→0.3/0.6」 |
+| 4 | 每次 new RestTemplate（L99-L102） | 已用注入单例（L34, L97） | 改动 1.2 删除「删除 new RestTemplate」描述 |
+| 5 | CompletableFuture + ForkJoinPool（L97） | 同步阻塞调用，无异步 | 改动 1.2 改为「将同步用 CompletableFuture 包装」 |
+| 6 | DeepSeekService 有重载方法 | 接口仅 4 个方法，无重载 | 改动 1.1 明确「需新增重载」 |
+| 7 | 业务调用方行号 L259/L61/L235/L277 | 实际 L260/L67/L265/L307 | 业务调用方表行号全部校正 |
+
+### 8.2 校正后的根因优先级
+
+校正后，真正的根因优先级（按影响降序）：
+
+| 优先级 | 根因 | 影响 | 改动归属 |
+|--------|------|------|----------|
+| P0 | max_tokens=4096 过大 | 生成 15-30 秒 | 改动 1.1 |
+| P0 | 读取超时 30 秒过长 | 用户等 30 秒才报错 | 改动 1.3（AppConfig） |
+| P1 | SimpleClientHttpRequestFactory 无连接池 | 每次多耗 300-800ms | 改动 1.3（AppConfig） |
+| P1 | temperature=0.7 偏高 | 生成发散 | 改动 1.1 |
+| P1 | 业务调用方无差异化参数 | 无法按场景调优 | 改动 1.1（业务调用方） |
+| P2 | 同步阻塞占用 Tomcat 线程 | 并发能力受限 | 改动 1.2（线程池） |
+| P2 | DeepSeekConfig.timeoutSeconds 配置失效 | 配置中心形同虚设 | 改动 1.3（读取配置） |
+
+### 8.3 校正对方案的影响
+
+**方案骨架不变**：JdkClientHttpRequestFactory 连接池、差异化 max_tokens、独立线程池三大改动仍正确，仅细节校正。
+
+**改动量调整**：
+- 改动 1.2 改动量略增（需将同步调用包装为 CompletableFuture，原假设已有异步）
+- 其余改动量不变
+
+**风险评估更新**：
+- 原风险「max_tokens 512 导致面试评价 JSON 截断」保留
+- 新增风险「异步化改造可能影响事务上下文」→ 缓解：AI 调用不涉及数据库事务
+
+### 8.4 校正验证
+
+- [x] 第一章根因表与实际代码一致（7 个根因全部基于实际代码）
+- [x] 第二章改动 1.1 行号正确（L89 temperature、L90 max_tokens）
+- [x] 第二章改动 1.2 删除「删除 new RestTemplate」描述
+- [x] 业务调用方行号全部校正（L260/L67/L265/L307/L56/L98）
+- [x] 保留 AppConfig 替换为 JdkClientHttpRequestFactory 的方案

@@ -43,29 +43,3 @@ logging:
 # DeepSeek API Key（通过环境变量 DEEPSEEK_API_KEY 注入，禁止硬编码）
 deepseek:
   api-key: ${DEEPSEEK_API_KEY}
-
-# Resilience4j 韧性增强配置
-resilience4j:
-  retry:
-    instances:
-      ai-call:
-        max-attempts: 3
-        wait-duration: 200ms
-        retry-exceptions:
-          - org.springframework.web.client.RestClientException
-          - java.util.concurrent.TimeoutException
-        ignore-exceptions:
-          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
-  circuitbreaker:
-    instances:
-      ai-call:
-        failure-rate-threshold: 50
-        slow-call-rate-threshold: 80
-        slow-call-duration-threshold: 5s
-        sliding-window-type: COUNT_BASED
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        wait-duration-in-open-state: 30s
-        permitted-number-of-calls-in-half-open-state: 1
-        automatic-transition-from-open-to-half-open-enabled: true
-        register-health-indicator: true

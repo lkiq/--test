@@ -47,7 +47,119 @@
 
       <!-- 右侧：推荐结果 -->
       <el-col :lg="14" :md="12" :sm="24">
-        <div class="results-panel" v-if="results.length">
+        <!-- 双队列模式：意向方向 + 稳妥备选 -->
+        <div class="results-panel" v-if="primaryResults.length && fallbackResults.length">
+          <div class="results-header">
+            <span class="rh-icon">🎯</span>
+            <div>
+              <h3>你的意向发展方向</h3>
+              <p>共 {{ primaryResults.length }} 个匹配结果</p>
+            </div>
+          </div>
+
+          <div class="result-list">
+            <div
+              v-for="(item, idx) in primaryResults"
+              :key="item.jobTitle"
+              class="result-item primary-item"
+              :style="{ animationDelay: (idx * 0.1) + 's' }"
+            >
+              <div class="ri-rank" :class="'rank-' + (idx + 1)">
+                {{ idx + 1 }}
+              </div>
+              <div class="ri-body">
+                <div class="ri-top">
+                  <div class="ri-title-wrap">
+                    <span class="ri-icon">{{ getRoleIcon(item.jobTitle) }}</span>
+                    <div>
+                      <h4 class="ri-title">{{ item.jobTitle }}</h4>
+                      <span class="ri-priority" :class="'prio-' + item.learningPriority">
+                        {{ item.learningPriority }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="ri-match">
+                    <svg class="ri-ring" viewBox="0 0 60 60">
+                      <circle cx="30" cy="30" r="25" fill="none" stroke="#e5e7eb" stroke-width="4" />
+                      <circle cx="30" cy="30" r="25" fill="none"
+                        :stroke="getMatchColor(item.matchScore)"
+                        stroke-width="4" stroke-linecap="round"
+                        :stroke-dasharray="(item.matchScore * 1.57) + ' ' + (157 - item.matchScore * 1.57)"
+                        transform="rotate(-90 30 30)" />
+                    </svg>
+                    <span class="ri-match-text" :style="{ color: getMatchColor(item.matchScore) }">
+                      {{ item.matchScore }}%
+                    </span>
+                  </div>
+                </div>
+                <p class="ri-reason">{{ item.reason }}</p>
+                <div class="ri-footer">
+                  <span class="ri-path">
+                    <span class="path-icon">🛤️</span> {{ item.growthPath }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-panel fallback-panel" v-if="fallbackResults.length">
+          <div class="results-header fallback-header">
+            <span class="rh-icon">🛡️</span>
+            <div>
+              <h3>更适配你的稳妥备选</h3>
+              <p>共 {{ fallbackResults.length }} 个备选方向</p>
+            </div>
+          </div>
+
+          <div class="result-list">
+            <div
+              v-for="(item, idx) in fallbackResults"
+              :key="item.jobTitle"
+              class="result-item fallback-item"
+              :style="{ animationDelay: (idx * 0.1) + 's' }"
+            >
+              <div class="ri-rank" :class="'rank-' + (idx + 1)">
+                {{ idx + 1 }}
+              </div>
+              <div class="ri-body">
+                <div class="ri-top">
+                  <div class="ri-title-wrap">
+                    <span class="ri-icon">{{ getRoleIcon(item.jobTitle) }}</span>
+                    <div>
+                      <h4 class="ri-title">{{ item.jobTitle }}</h4>
+                      <span class="ri-priority" :class="'prio-' + item.learningPriority">
+                        {{ item.learningPriority }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="ri-match">
+                    <svg class="ri-ring" viewBox="0 0 60 60">
+                      <circle cx="30" cy="30" r="25" fill="none" stroke="#e5e7eb" stroke-width="4" />
+                      <circle cx="30" cy="30" r="25" fill="none"
+                        :stroke="getMatchColor(item.matchScore)"
+                        stroke-width="4" stroke-linecap="round"
+                        :stroke-dasharray="(item.matchScore * 1.57) + ' ' + (157 - item.matchScore * 1.57)"
+                        transform="rotate(-90 30 30)" />
+                    </svg>
+                    <span class="ri-match-text" :style="{ color: getMatchColor(item.matchScore) }">
+                      {{ item.matchScore }}%
+                    </span>
+                  </div>
+                </div>
+                <p class="ri-reason">{{ item.reason }}</p>
+                <div class="ri-footer">
+                  <span class="ri-path">
+                    <span class="path-icon">🛤️</span> {{ item.growthPath }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 单队列模式：兼容字段 directions -->
+        <div class="results-panel" v-else-if="results.length">
           <div class="results-header">
             <span class="rh-icon">✨</span>
             <div>
@@ -105,27 +217,33 @@
         <!-- 空状态 -->
         <div v-else class="results-empty">
           <div class="empty-illustration">
-            <div class="empty-icon-bg">🎯</div>
+            <div class="empty-icon-bg">{{ hasQueried ? '🔍' : '🎯' }}</div>
             <div class="empty-pulse-ring"></div>
           </div>
-          <h3>探索你的职业方向</h3>
-          <p>在左侧与AI对话，它会根据你的兴趣和技能<br/>智能推荐最适合你的职业道路</p>
-          <div class="empty-steps">
-            <div class="empty-step">
-              <span class="step-num">1</span>
-              <span>描述兴趣偏好</span>
+          <template v-if="hasQueried">
+            <h3>暂时没有匹配到合适的推荐方向</h3>
+            <p>你可以尝试描述更多兴趣、技能或目标，<br/>我会重新为你分析最合适的职业方向</p>
+          </template>
+          <template v-else>
+            <h3>探索你的职业方向</h3>
+            <p>在左侧与AI对话，它会根据你的兴趣和技能<br/>智能推荐最适合你的职业道路</p>
+            <div class="empty-steps">
+              <div class="empty-step">
+                <span class="step-num">1</span>
+                <span>描述兴趣偏好</span>
+              </div>
+              <div class="step-arrow">→</div>
+              <div class="empty-step">
+                <span class="step-num">2</span>
+                <span>AI智能分析</span>
+              </div>
+              <div class="step-arrow">→</div>
+              <div class="empty-step">
+                <span class="step-num">3</span>
+                <span>获取推荐方向</span>
+              </div>
             </div>
-            <div class="step-arrow">→</div>
-            <div class="empty-step">
-              <span class="step-num">2</span>
-              <span>AI智能分析</span>
-            </div>
-            <div class="step-arrow">→</div>
-            <div class="empty-step">
-              <span class="step-num">3</span>
-              <span>获取推荐方向</span>
-            </div>
-          </div>
+          </template>
         </div>
       </el-col>
     </el-row>
@@ -133,15 +251,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import ChatWindow from '@/components/common/ChatWindow.vue'
-import { exploreCareer } from '@/api/student'
+import { exploreCareer, exploreFromAssessment } from '@/api/student'
 
+const route = useRoute()
 const messages = ref<any[]>([
   { role: 'assistant', content: '你好！我是AI职业规划助手。请告诉我你的职业兴趣和技术偏好，我会为你推荐最合适的职业方向。' }
 ])
 const loading = ref(false)
 const results = ref<any[]>([])
+/** 双队列：意向发展方向（兴趣权重上浮） */
+const primaryResults = ref<any[]>([])
+/** 双队列：稳妥备选方向（画像/测评客观适配） */
+const fallbackResults = ref<any[]>([])
+const hasQueried = ref(false)
 
 function getRoleIcon(title: string): string {
   const map: Record<string, string> = {
@@ -162,9 +287,50 @@ function getMatchColor(score: number): string {
   return '#ef4444'
 }
 
+/**
+ * 将后端返回的推荐结果渲染到对话消息与结果卡片区
+ * 抽离公共逻辑，供 handleSend 与 fromAssessment 自动触发共用
+ */
+function applyRecommendation(data: any, userText?: string) {
+  if (userText) {
+    messages.value.push({ role: 'user', content: userText })
+  }
+  // 追问场景：信息不足，AI 主动提问，不展示推荐卡片
+  if (data.needClarification) {
+    results.value = []
+    primaryResults.value = []
+    fallbackResults.value = []
+    const clarifyContent = data.overallAnalysis || '为了给你推荐更合适的岗位，请告诉我你感兴趣的方向和期望工作的城市。'
+    messages.value.push({ role: 'assistant', content: clarifyContent })
+    return
+  }
+  // 正常推荐场景：优先使用双队列（意向方向 + 稳妥备选），无则降级到单队列
+  const primary = data.primaryDirections || []
+  const fallback = data.fallbackDirections || []
+  if (primary.length > 0 && fallback.length > 0) {
+    primaryResults.value = primary
+    fallbackResults.value = fallback
+    results.value = []
+  } else {
+    results.value = data.directions || []
+    primaryResults.value = []
+    fallbackResults.value = []
+  }
+  let content = data.overallAnalysis || '分析完成！我已经根据你的偏好匹配了以下职业方向，请在右侧查看详细推荐结果。'
+  if (content.includes('暂未筛选到满足要求的岗位')) {
+    content += '\n（提示：以下为系统根据你的画像与测评补充的最接近推荐，可尝试放宽条件获取更多结果。）'
+  }
+  messages.value.push({ role: 'assistant', content })
+}
+
 async function handleSend(text: string) {
   messages.value.push({ role: 'user', content: text })
   loading.value = true
+  hasQueried.value = true
+  // 重置上一轮推荐结果，避免新旧叠加
+  results.value = []
+  primaryResults.value = []
+  fallbackResults.value = []
   try {
     // 发送偏好文本 + 完整对话历史
     const history = messages.value.slice(0, -1).map(m => ({
@@ -172,16 +338,35 @@ async function handleSend(text: string) {
       content: m.content
     }))
     const res: any = await exploreCareer({ preferences: text, history })
-    const data = res.data
-    results.value = data.directions || []
-    messages.value.push({
-      role: 'assistant',
-      content: data.overallAnalysis || '分析完成！我已经根据你的偏好匹配了以下职业方向，请在右侧查看详细推荐结果。'
-    })
+    // handleSend 已 push 用户消息，传 undefined 避免重复
+    applyRecommendation(res.data)
   } catch {
     messages.value.push({ role: 'system', content: '分析失败，请稍后重试' })
   } finally { loading.value = false }
 }
+
+/**
+ * 初始化：若 URL 参数 fromAssessment=true&resultId=xxx，
+ * 自动以测评摘要触发推荐（测评结果页「基于测评结果探索职业方向」按钮跳转入口）
+ */
+onMounted(async () => {
+  const fromAssessment = route.query.fromAssessment === 'true'
+  const resultIdStr = route.query.resultId as string
+  console.log('[CareerExploration] fromAssessment=', fromAssessment, 'resultId=', resultIdStr)
+  if (!fromAssessment || !resultIdStr) return
+  const resultId = Number(resultIdStr)
+  if (!Number.isFinite(resultId)) return
+  loading.value = true
+  hasQueried.value = true
+  try {
+    const res: any = await exploreFromAssessment(resultId)
+    const userText = '我刚完成能力测评，请基于我的测评结果推荐合适的职业方向。'
+    applyRecommendation(res.data, userText)
+  } catch (e: any) {
+    console.error('[CareerExploration] 基于测评推荐失败:', e)
+    messages.value.push({ role: 'system', content: '基于测评的推荐失败，请在下方输入你的偏好重新尝试。' })
+  } finally { loading.value = false }
+})
 </script>
 
 <style scoped lang="scss">
@@ -306,6 +491,7 @@ async function handleSend(text: string) {
   padding: 24px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.06);
   min-height: 200px;
+  & + .results-panel { margin-top: 16px; }
 }
 
 .results-header {
@@ -318,6 +504,28 @@ async function handleSend(text: string) {
   .rh-icon { font-size: 28px; }
   h3 { font-size: 18px; font-weight: 700; color: #1f2937; margin: 0; }
   p { font-size: 13px; color: #9ca3af; margin: 2px 0 0 0; }
+}
+
+// 双队列：稳妥备选区块采用差异化配色（蓝绿基调，区别于意向方向的紫色基调）
+.fallback-panel {
+  background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 30%);
+  border: 1px solid #ccfbf1;
+}
+
+.fallback-header {
+  border-bottom-color: #99f6e4;
+  h3 { color: #0f766e; }
+  p { color: #14b8a6; }
+}
+
+// 意向方向卡片：左侧紫色强调边
+.primary-item {
+  border-left: 3px solid #6366f1;
+}
+
+// 稳妥备选卡片：左侧青色强调边
+.fallback-item {
+  border-left: 3px solid #14b8a6;
 }
 
 .result-list {

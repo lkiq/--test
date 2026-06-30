@@ -306,7 +306,10 @@
 
       <!-- 行动按钮 -->
       <div class="result-actions">
-        <el-button type="primary" size="large" @click="$router.push('/student/gap-analysis')">
+        <el-button type="primary" size="large" @click="exploreCareerFromAssessment">
+          🎯 基于测评结果探索职业方向
+        </el-button>
+        <el-button size="large" @click="$router.push('/student/gap-analysis')">
           📈 查看差距分析
         </el-button>
         <el-button size="large" @click="$router.push('/student/learning-path')">
@@ -320,16 +323,34 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ArrowRight, ArrowLeft, Close, Clock, WarningFilled } from '@element-plus/icons-vue'
 import { useAssessmentStore } from '@/stores/assessment'
 import { getAssessmentQuestions, submitAssessment } from '@/api/student'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+const router = useRouter()
 const assessmentStore = useAssessmentStore()
 const started = computed(() => assessmentStore.questions.length > 0)
 const finished = ref(false)
 const result = ref<any>(null)
 const selectedAnswer = ref('')
+
+/**
+ * 基于测评结果直达职业探索推荐
+ * 跳转到职业探索页并携带 resultId，目标页 onMounted 时自动调用 from-assessment 接口
+ */
+function exploreCareerFromAssessment() {
+  const resultId = result.value?.id
+  if (!resultId) {
+    ElMessage.warning('未找到测评结果，请先完成测评')
+    return
+  }
+  router.push({
+    path: '/student/career-exploration',
+    query: { fromAssessment: 'true', resultId: String(resultId) }
+  })
+}
 
 // 监听剩余时间，时间到自动提交
 watch(() => assessmentStore.remainingTime, (val) => {

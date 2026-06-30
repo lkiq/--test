@@ -18,4 +18,4 @@
 - [x] （可选）`doCallAPI` 用 `CompletableFuture.supplyAsync` 包装同步调用
 - [x] （可选）新增 `@PreDestroy shutdown()` 方法销毁线程池
 - [x] `mvn compile` 编译通过，无错误
-- [ ] 改动合并为 1 个 Git commit
+- [x] 改动合并为 1 个 Git commit

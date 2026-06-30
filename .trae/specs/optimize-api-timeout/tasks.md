@@ -27,7 +27,7 @@
   - [x] SubTask 5.3: 新增 `@PreDestroy shutdown()` 方法销毁线程池
 - [x] Task 6: 编译验证
   - [x] SubTask 6.1: 执行 `mvn compile`，确认 BUILD SUCCESS 无编译错误
-- [ ] Task 7: Git commit（合并为 1 个 commit，便于精准回滚）
+- [x] Task 7: Git commit（合并为 1 个 commit，便于精准回滚）
 
 # Task Dependencies
 

@@ -1,8 +1,6 @@
 package com.xuelian.career.common;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,13 +16,12 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     /**
-     * 处理业务异常
+     * 处理业务异常 - 始终返回 HTTP 200，业务状态码放在 JSON body 中
      */
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e) {
+    public Result<Void> handleBusinessException(BusinessException e) {
         log.warn("业务异常: code={}, message={}", e.getCode(), e.getMessage());
-        return ResponseEntity.status(e.getCode() == 401 ? 401 : 400)
-                .body(Result.error(e.getCode(), e.getMessage()));
+        return Result.error(e.getCode(), e.getMessage());
     }
 
     /**
